@@ -239,7 +239,9 @@ std::vector<SpectralPeak> findPeaks(const std::vector<float>& power, double binH
     const double floorDb = tmp[m / 2];
     const int lobe = windowMainLobeBins(w);
     std::vector<int> cand;
-    for (int k = std::max(1, lobe); k < m - 1; ++k)
+    // bins closer to DC than two main-lobe widths are excluded: leakage of a DC offset
+    // would otherwise be reported as a (meaningless) near-0 Hz "tone"
+    for (int k = std::max(1, 2 * lobe); k < m - 1; ++k)
         if (db[k] > db[k - 1] && db[k] >= db[k + 1] && db[k] > floorDb + minRelDb) cand.push_back(k);
     std::sort(cand.begin(), cand.end(), [&](int a, int b) { return db[a] > db[b]; });
     std::vector<int> chosen;

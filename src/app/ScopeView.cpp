@@ -260,6 +260,7 @@ bool ScopeView::drawTrace(QPainter& p, const QRectF& pr, const TraceData& tr, in
         const double a = std::clamp(alpha, 0.0, 1.0);
         const uint32_t sa = static_cast<uint32_t>(std::lround(255 * a));
         const uint32_t sr = cc.red() * sa / 255, sg = cc.green() * sa / 255, sb = cc.blue() * sa / 255;
+        const QRgb solid = qRgba(static_cast<int>(sr), static_cast<int>(sg), static_cast<int>(sb), static_cast<int>(sa));
         auto blend = [&](QRgb* px, double cov) {
             const uint32_t k = static_cast<uint32_t>(cov * 256.0);
             const uint32_t a2 = sa * k >> 8, r2 = sr * k >> 8, g2 = sg * k >> 8, b2 = sb * k >> 8;
@@ -305,7 +306,9 @@ bool ScopeView::drawTrace(QPainter& p, const QRectF& pr, const TraceData& tr, in
             const int y0 = static_cast<int>(std::floor(yt)), y1 = static_cast<int>(std::ceil(yb));
             for (int yy = y0; yy < y1; ++yy) {
                 const double cov = std::min(yb, yy + 1.0) - std::max(yt, static_cast<double>(yy));
-                if (cov > 0) blend(reinterpret_cast<QRgb*>(bits + yy * bpl) + c, std::min(1.0, cov));
+                QRgb* px = reinterpret_cast<QRgb*>(bits + yy * bpl) + c;
+                if (cov >= 1.0 && sa == 255) *px = solid; // opaque interior pixel: plain store
+                else if (cov > 0) blend(px, std::min(1.0, cov));
             }
         }
         return true;

@@ -239,6 +239,7 @@ void Knob::applySteps(int steps, bool fine) {
 void Knob::paintEvent(QPaintEvent*) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
+    if (!isEnabled()) p.setOpacity(0.3); // parameter not used by the current waveform
     const QRectF r = rect();
     // title
     QFont tf = font();

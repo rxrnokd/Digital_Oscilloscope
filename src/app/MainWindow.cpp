@@ -216,6 +216,7 @@ MainWindow::MainWindow(const AppOptions& opt, QWidget* parent) : QMainWindow(par
     adopt(s_);
     if (s_.trigger.mode == TriggerMode::Single) engine_->single();
     else engine_->run();
+    if (!opt_.openFile.isEmpty() && file_) QTimer::singleShot(300, this, &MainWindow::autoscale);
 
     resize(opt_.size.isValid() ? opt_.size : QSize(1600, 1000));
     vsplit_->setSizes({620, 330, 150});
@@ -363,7 +364,7 @@ QWidget* MainWindow::buildChannelsTab() {
         u.card->body()->addLayout(top);
 
         u.vdiv = knob("Volts/div", Knob::step125Stepper(),
-                      [this, c](double v) {
+                      [this](double v) {
                           const std::string unit = s_.acq.source == SourceKind::Audio ? "FS" : "V";
                           return fmt(v, unit.c_str(), 3) + "/";
                       },
@@ -746,7 +747,7 @@ QWidget* MainWindow::buildSpectrumTab() {
                     100, 10.0, [this](double v) { edit([&](ScopeSettings& s) { s.spectrum.refLevel = v; }); });
     specStart_ = knob("Start", Knob::logStepper(), [](double v) { return fmt(v, "Hz", 4); }, 0.0, 1e10, 0.0,
                       [this](double v) { edit([&](ScopeSettings& s) { s.spectrum.fStart = v; }); });
-    specStop_ = knob("Stop", Knob::logStepper(), [this](double v) {
+    specStop_ = knob("Stop", Knob::logStepper(), [](double v) {
         return v <= 0 ? QStringLiteral("Nyquist") : fmt(v, "Hz", 4);
     }, 0.0, 1e10, 0.0, [this](double v) { edit([&](ScopeSettings& s) { s.spectrum.fStop = v; }); });
     c->body()->addLayout(row({specRef_, specStart_, specStop_}));
@@ -950,10 +951,8 @@ QWidget* MainWindow::buildMeasurementPanel() {
     meas_->setSelectionMode(QAbstractItemView::NoSelection);
     meas_->setFocusPolicy(Qt::NoFocus);
     meas_->setFont(monoFont(9.5));
-    meas_->setMinimumHeight(80);
     v->addWidget(meas_);
-    w->setMinimumHeight(110);
-    w->setMaximumHeight(190);
+    w->setMinimumHeight(60);
     return w;
 }
 
@@ -961,7 +960,13 @@ void MainWindow::updateMeasurements(const Frame& f) {
     std::vector<int> rows;
     for (int i = 0; i < kNumTraces; ++i)
         if (f.tr[i].present) rows.push_back(i);
-    meas_->setRowCount(static_cast<int>(rows.size()));
+    if (meas_->rowCount() != static_cast<int>(rows.size())) {
+        meas_->setRowCount(static_cast<int>(rows.size()));
+        // shrink the panel to its content so the free space goes to the displays
+        const int h = meas_->horizontalHeader()->height() + std::max<int>(1, static_cast<int>(rows.size())) * 22 + 6;
+        meas_->setFixedHeight(h);
+        measPanel_->setMaximumHeight(h + 26);
+    }
     for (int r = 0; r < static_cast<int>(rows.size()); ++r) {
         const int i = rows[r];
         const auto& tr = f.tr[i];
@@ -1027,7 +1032,7 @@ void MainWindow::buildMenus() {
     add(file, tr("Save Waveform as CSV..."), QKeySequence(Qt::CTRL | Qt::Key_E), [this] { saveWaveformCsv(); });
     add(file, tr("Save Waveform as WAV..."), QKeySequence(), [this] { saveWaveformWav(); });
     add(file, tr("Save Screen Image (PNG)..."), QKeySequence(Qt::CTRL | Qt::Key_P), [this] { saveImage(); });
-    add(file, tr("Export Measurements (CSV)..."), QKeySequence(Qt::CTRL | Qt::Key_M), [this] { exportMeasurements(); });
+    add(file, tr("Export Measurements (CSV)..."), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E), [this] { exportMeasurements(); });
     file->addSeparator();
     add(file, tr("Load Setup..."), QKeySequence(Qt::CTRL | Qt::Key_L), [this] { loadSetup(); });
     add(file, tr("Save Setup..."), QKeySequence::Save, [this] { saveSetup(); });
