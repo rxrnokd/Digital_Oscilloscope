@@ -1,0 +1,68 @@
+# End-to-end "restart and restore" test for the real application.
+#   1st run : start with an empty session, apply a setup file, quit  -> session saved
+#   2nd run : start with that session, quit, dump the live settings
+#   verify  : the dumped settings equal the setup file (checked key by key)
+# Variables: APP (executable), SETUP (json), WORKDIR
+file(REMOVE_RECURSE "${WORKDIR}")
+file(MAKE_DIRECTORY "${WORKDIR}")
+set(SESSION "${WORKDIR}/session.json")
+set(DUMP "${WORKDIR}/dump.json")
+
+execute_process(COMMAND "${APP}" --settings "${SESSION}" --load-setup "${SETUP}" --quit-after 1500
+                RESULT_VARIABLE r1 OUTPUT_VARIABLE o1 ERROR_VARIABLE e1 TIMEOUT 60)
+if(NOT r1 EQUAL 0)
+    message(FATAL_ERROR "first run failed (${r1}): ${e1}")
+endif()
+if(NOT EXISTS "${SESSION}")
+    message(FATAL_ERROR "session file was not written on exit")
+endif()
+
+execute_process(COMMAND "${APP}" --settings "${SESSION}" --dump-settings "${DUMP}" --quit-after 1500
+                RESULT_VARIABLE r2 OUTPUT_VARIABLE o2 ERROR_VARIABLE e2 TIMEOUT 60)
+if(NOT r2 EQUAL 0)
+    message(FATAL_ERROR "second run failed (${r2}): ${e2}")
+endif()
+if(NOT EXISTS "${DUMP}")
+    message(FATAL_ERROR "settings dump was not written")
+endif()
+
+file(READ "${SETUP}" expected)
+file(READ "${DUMP}" actual)
+
+set(failures 0)
+macro(compare)
+    string(JSON ev ERROR_VARIABLE ee GET "${expected}" ${ARGN})
+    string(JSON av ERROR_VARIABLE ae GET "${actual}" ${ARGN})
+    if(ee)
+        message(FATAL_ERROR "setup file lacks key ${ARGN}: ${ee}")
+    endif()
+    if(NOT "${ev}" STREQUAL "${av}")
+        message(SEND_ERROR "mismatch at ${ARGN}: expected '${ev}', restored '${av}'")
+        math(EXPR failures "${failures}+1")
+    else()
+        message(STATUS "ok  ${ARGN} = ${av}")
+    endif()
+endmacro()
+
+compare(timebase secPerDiv)
+compare(timebase triggerPos)
+compare(trigger mode)
+compare(trigger level)
+compare(trigger source)
+compare(generators 0 shape)
+compare(generators 0 frequency)
+compare(generators 0 components 1 multiple)
+compare(channels 0 voltsPerDiv)
+compare(channels 0 position)
+compare(channels 1 enabled)
+compare(spectrum fftSize)
+compare(spectrum window)
+compare(spectrum fStart)
+compare(spectrum fStop)
+compare(math enabled)
+compare(display persistence)
+
+if(failures GREATER 0)
+    message(FATAL_ERROR "${failures} setting(s) were not restored")
+endif()
+message(STATUS "restart test passed")

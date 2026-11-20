@@ -1,0 +1,28 @@
+{
+    "format": "SIGNAL LAB PRO setup",
+    "version": 1,
+    "description": "AM signal: 10 kHz carrier, 1 kHz modulation, m = 0.5. Holdoff gives a stable envelope; the FFT shows the carrier and the two sidebands at -12 dBc.",
+    "channels": [
+        { "enabled": true, "voltsPerDiv": 0.5, "position": 0, "coupling": "DC", "input": 0, "color": "#ffd60a" },
+        { "enabled": false }
+    ],
+    "generators": [
+        {
+            "output": true, "shape": "Custom", "frequency": 10000, "offset": 0, "noiseRms": 0.002,
+            "components": [
+                { "shape": "Sine", "multiple": 1.0, "vpp": 2.0, "phaseDeg": 0 },
+                { "shape": "Sine", "multiple": 0.9, "vpp": 0.5, "phaseDeg": 0 },
+                { "shape": "Sine", "multiple": 1.1, "vpp": 0.5, "phaseDeg": 0 }
+            ]
+        }
+    ],
+    "timebase": { "secPerDiv": 0.0002, "delay": 0, "triggerPos": 50, "autoRoll": true },
+    "trigger": { "mode": "Auto", "slope": "Rising", "source": 0, "level": 1.2, "holdoff": 0.0006, "hysteresisDiv": 0.08 },
+    "acquisition": { "source": "Generator", "sampleRate": 1000000, "refreshRate": 60 },
+    "math": { "enabled": false },
+    "spectrum": {
+        "enabled": true, "source": 0, "fftSize": 65536, "window": "BlackmanHarris", "logScale": true,
+        "refLevel": 10, "dbPerDiv": 10, "fStart": 5000, "fStop": 15000, "averages": 4, "spectrogram": true
+    },
+    "display": { "persistence": "Short", "interpolation": "SinX", "glow": true, "cursorMode": "Off" }
+}
