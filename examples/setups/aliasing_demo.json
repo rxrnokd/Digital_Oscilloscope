@@ -1,0 +1,19 @@
+{
+    "format": "SIGNAL LAB PRO setup", "version": 1,
+    "description": "Aliasing: GEN1 = 9.2 kHz sine sampled at 10 kSa/s (fs/2 = 5 kHz) appears as |9.2k - 10k| = 800 Hz. CH2 shows a real 800 Hz sine for comparison; the FFT of CH1 has its peak at 800 Hz.",
+    "channels": [
+        { "enabled": true, "voltsPerDiv": 0.5, "position": 1.8, "input": 0 },
+        { "enabled": true, "voltsPerDiv": 0.5, "position": -1.8, "input": 1 },
+        { "enabled": false }, { "enabled": false }
+    ],
+    "generators": [
+        { "shape": "Sine", "frequency": 9200, "vpp": 2.0, "phaseDeg": 0 },
+        { "shape": "Sine", "frequency": 800, "vpp": 2.0, "phaseDeg": 0 }
+    ],
+    "timebase": { "secPerDiv": 0.0005, "delay": 0, "triggerPos": 50 },
+    "trigger": { "mode": "Auto", "slope": "Rising", "source": 1, "level": 0 },
+    "acquisition": { "source": "Generator", "sampleRate": 10000 },
+    "math": { "enabled": false },
+    "spectrum": { "enabled": true, "source": 0, "fftSize": 4096, "window": "Hann", "fStart": 0, "fStop": 0 },
+    "display": { "interpolation": "Linear" }
+}

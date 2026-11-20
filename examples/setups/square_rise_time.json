@@ -1,0 +1,16 @@
+{
+    "format": "SIGNAL LAB PRO setup", "version": 1,
+    "description": "3.3 V logic pulse, 10 kHz, 2 us 10-90 % edges, sampled at 100 MSa/s. The screen shows only the rising edge: Rise is measured (2.000 us) while Freq/Period are N/A because no full cycle is on screen. Cursors mark the 10 % / 90 % points.",
+    "channels": [
+        { "enabled": true, "voltsPerDiv": 0.5, "position": -3.3, "input": 0 },
+        { "enabled": false }, { "enabled": false }, { "enabled": false }
+    ],
+    "generators": [ { "shape": "Pulse", "frequency": 10000, "vpp": 3.3, "offset": 1.65, "duty": 30, "edgeTime": 2e-6, "noiseRms": 0 } ],
+    "timebase": { "secPerDiv": 5e-7, "delay": 0, "triggerPos": 50 },
+    "trigger": { "mode": "Normal", "slope": "Rising", "source": 0, "level": 1.65, "holdoff": 0, "hysteresisDiv": 0.08 },
+    "acquisition": { "source": "Generator", "sampleRate": 100000000 },
+    "math": { "enabled": false },
+    "spectrum": { "enabled": false },
+    "display": { "persistence": "Off", "interpolation": "SinX", "glow": true, "cursorMode": "Manual", "cursorSource": 0,
+                 "cursorX1": -1e-6, "cursorX2": 1e-6, "cursorY1": 0.33, "cursorY2": 2.97, "showSpectrum": false }
+}

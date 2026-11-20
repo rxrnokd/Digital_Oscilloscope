@@ -123,16 +123,26 @@ void ScopeView::paintEvent(QPaintEvent*) {
     p.setRenderHint(QPainter::Antialiasing);
     const QRectF pr = plotRect();
 
-    QLinearGradient bg(0, 0, 0, height());
-    bg.setColorAt(0, QColor(0x0b, 0x0d, 0x11));
-    bg.setColorAt(1, QColor(0x07, 0x08, 0x0b));
-    p.fillRect(rect(), bg);
-    QRadialGradient screen(pr.center(), std::max(pr.width(), pr.height()) * 0.75);
-    screen.setColorAt(0, QColor(0x0d, 0x11, 0x16));
-    screen.setColorAt(1, QColor(0x05, 0x06, 0x08));
-    p.fillRect(pr, screen);
-
-    drawGrid(p, pr);
+    // background + graticule are static: render once per size / intensity into a pixmap
+    const double dpr = devicePixelRatioF();
+    const QString bgKey = QStringLiteral("%1x%2@%3/%4").arg(width()).arg(height()).arg(dpr).arg(s_.display.gridIntensity);
+    if (bgKey != backgroundKey_) {
+        background_ = QPixmap((QSizeF(size()) * dpr).toSize());
+        background_.setDevicePixelRatio(dpr);
+        QPainter bp(&background_);
+        bp.setRenderHint(QPainter::Antialiasing);
+        QLinearGradient bg(0, 0, 0, height());
+        bg.setColorAt(0, QColor(0x0b, 0x0d, 0x11));
+        bg.setColorAt(1, QColor(0x07, 0x08, 0x0b));
+        bp.fillRect(rect(), bg);
+        QRadialGradient screen(pr.center(), std::max(pr.width(), pr.height()) * 0.75);
+        screen.setColorAt(0, QColor(0x0d, 0x11, 0x16));
+        screen.setColorAt(1, QColor(0x05, 0x06, 0x08));
+        bp.fillRect(pr, screen);
+        drawGrid(bp, pr);
+        backgroundKey_ = bgKey;
+    }
+    p.drawPixmap(0, 0, background_);
     if (frame_) {
         if (s_.display.persistence != Persistence::Off) {
             drawPersistence(p, pr);
@@ -187,24 +197,33 @@ void ScopeView::drawGrid(QPainter& p, const QRectF& pr) {
 }
 
 void ScopeView::drawTraces(QPainter& p, const QRectF& pr, double alpha, bool glow) {
+    const double dpr = devicePixelRatioF();
+    const QSize sz = (pr.size() * dpr).toSize();
+    if (layer_.size() != sz) {
+        layer_ = QImage(sz, QImage::Format_ARGB32_Premultiplied);
+        layer_.setDevicePixelRatio(dpr);
+    }
+    layer_.fill(Qt::transparent);
+    bool usedLayer = false;
     // draw selected trace last so it stays on top
     const int sel = std::clamp(s_.display.selectedTrace, 0, kNumTraces - 1);
     for (int pass = 0; pass < 2; ++pass)
         for (int i = 0; i < kNumTraces; ++i) {
             if ((pass == 0) == (i == sel)) continue;
             if (!traceEnabled(i) || !frame_->tr[i].present) continue;
-            drawTrace(p, pr, frame_->tr[i], i, alpha, glow);
+            usedLayer |= drawTrace(p, pr, frame_->tr[i], i, alpha, glow);
         }
+    if (usedLayer) p.drawImage(pr.topLeft(), layer_);
 }
 
-void ScopeView::drawTrace(QPainter& p, const QRectF& pr, const TraceData& tr, int idx, double alpha, bool glow) {
+bool ScopeView::drawTrace(QPainter& p, const QRectF& pr, const TraceData& tr, int idx, double alpha, bool glow) {
     const auto& y = tr.y;
     const long n = static_cast<long>(y.size());
-    if (n < 1 || !(tr.dt > 0)) return;
+    if (n < 1 || !(tr.dt > 0)) return false;
     const double W = windowWidth(), t0w = windowStart();
     const long k0 = std::max(0L, static_cast<long>(std::floor((t0w - tr.t0) / tr.dt)) - 1);
     const long k1 = std::min(n - 1, static_cast<long>(std::ceil((t0w + W - tr.t0) / tr.dt)) + 1);
-    if (k1 < k0) return;
+    if (k1 < k0) return false;
     const double dpr = devicePixelRatioF();
     const double pxPerSample = tr.dt / W * pr.width();
     const double scale = traceScale(idx), pos = tracePos(idx), unitPx = pr.height() / 8.0, cy = pr.center().y();
@@ -217,29 +236,79 @@ void ScopeView::drawTrace(QPainter& p, const QRectF& pr, const TraceData& tr, in
         if (!cur.isEmpty()) segs.push_back(cur);
         cur.clear();
     };
+    const double wdt = idx < kNumChannels ? s_.ch[idx].lineWidth : 1.6;
     bool dots = false;
-    if (pxPerSample * dpr < 0.5) {
-        // peak-detect envelope: min & max of every device-pixel column
-        const int cols = std::max(1, static_cast<int>(pr.width() * dpr));
-        const double colW = pr.width() / cols, colT = W / cols;
-        cur.reserve(2 * cols);
+    // "Busy" sparse data (e.g. heavy noise): stroking a long zig-zag with a thick
+    // antialiased pen is very expensive, so it is drawn as an envelope as well.
+    bool busy = false;
+    if (pxPerSample * dpr >= 1.0 && k1 - k0 > 256) {
+        double travel = 0;
+        for (long k = k0 + 1; k <= k1; ++k)
+            if (std::isfinite(y[k]) && std::isfinite(y[k - 1])) travel += std::fabs(static_cast<double>(y[k]) - y[k - 1]);
+        busy = travel / scale * unitPx > 25.0 * pr.height();
+    }
+    if (pxPerSample * dpr < 1.0 || busy) {
+        // Peak-detect envelope: for every device-pixel column the min/max of the
+        // piecewise-linear waveform (samples inside the column + values interpolated at
+        // the column borders, which keeps steep edges connected), padded to the line
+        // width. Each column is rasterized as a vertical span straight into the layer
+        // image with fractional (anti-aliased) end pixels - the way a DSO draws - so the
+        // cost no longer depends on how noisy the signal is.
+        const int cols = layer_.width(), rows = layer_.height();
+        const double colT = W / std::max(1, cols);
+        QColor cc = traceColor(idx);
+        const double a = std::clamp(alpha, 0.0, 1.0);
+        const uint32_t sa = static_cast<uint32_t>(std::lround(255 * a));
+        const uint32_t sr = cc.red() * sa / 255, sg = cc.green() * sa / 255, sb = cc.blue() * sa / 255;
+        auto blend = [&](QRgb* px, double cov) {
+            const uint32_t k = static_cast<uint32_t>(cov * 256.0);
+            const uint32_t a2 = sa * k >> 8, r2 = sr * k >> 8, g2 = sg * k >> 8, b2 = sb * k >> 8;
+            const uint32_t inv = 255 - a2;
+            const QRgb d = *px;
+            *px = qRgba(static_cast<int>(r2 + qRed(d) * inv / 255), static_cast<int>(g2 + qGreen(d) * inv / 255),
+                        static_cast<int>(b2 + qBlue(d) * inv / 255), static_cast<int>(a2 + qAlpha(d) * inv / 255));
+        };
+        auto interp = [&](double t, float& out) {
+            const double kf = (t - tr.t0) / tr.dt;
+            const auto i = static_cast<long>(std::floor(kf));
+            if (i < 0 || i + 1 >= n) return false;
+            const float va = y[i], vb = y[i + 1];
+            if (!std::isfinite(va) || !std::isfinite(vb)) return false;
+            out = static_cast<float>(va + (vb - va) * (kf - static_cast<double>(i)));
+            return true;
+        };
+        const double minH = wdt * dpr;
+        uchar* bits = layer_.bits();
+        const qsizetype bpl = layer_.bytesPerLine();
         for (int c = 0; c < cols; ++c) {
-            const double ta = t0w + c * colT;
-            long ks = static_cast<long>(std::ceil((ta - tr.t0) / tr.dt));
-            long ke = static_cast<long>(std::ceil((ta + colT - tr.t0) / tr.dt)) - 1;
-            ks = std::max(ks, 0L);
-            ke = std::min(ke, n - 1);
-            if (ke < ks) { flush(); continue; }
+            const double ta = t0w + c * colT, tb = ta + colT;
             float mn = std::numeric_limits<float>::infinity(), mx = -mn;
+            const long ks = std::max(0L, static_cast<long>(std::ceil((ta - tr.t0) / tr.dt)));
+            const long ke = std::min(n - 1, static_cast<long>(std::floor((tb - tr.t0) / tr.dt)));
             for (long k = ks; k <= ke; ++k) {
                 const float v = y[k];
                 if (std::isfinite(v)) { mn = std::min(mn, v); mx = std::max(mx, v); }
             }
-            if (!(mx >= mn)) { flush(); continue; }
-            const double x = pr.left() + (c + 0.5) * colW;
-            cur << QPointF(x, Y(mx)) << QPointF(x, Y(mn));
+            float v;
+            if (interp(ta, v)) { mn = std::min(mn, v); mx = std::max(mx, v); }
+            if (interp(tb, v)) { mn = std::min(mn, v); mx = std::max(mx, v); }
+            if (!(mx >= mn)) continue;
+            double yt = (Y(mx) - pr.top()) * dpr, yb = (Y(mn) - pr.top()) * dpr;
+            if (yb - yt < minH) {
+                const double mid = 0.5 * (yt + yb);
+                yt = mid - 0.5 * minH;
+                yb = mid + 0.5 * minH;
+            }
+            yt = std::max(yt, 0.0);
+            yb = std::min(yb, static_cast<double>(rows));
+            if (yb <= yt) continue;
+            const int y0 = static_cast<int>(std::floor(yt)), y1 = static_cast<int>(std::ceil(yb));
+            for (int yy = y0; yy < y1; ++yy) {
+                const double cov = std::min(yb, yy + 1.0) - std::max(yt, static_cast<double>(yy));
+                if (cov > 0) blend(reinterpret_cast<QRgb*>(bits + yy * bpl) + c, std::min(1.0, cov));
+            }
         }
-        flush();
+        return true;
     } else if (s_.display.interpolation == Interpolation::SinX && pxPerSample > 3.0) {
         // band-limited reconstruction (sin(x)/x with a Lanczos window, a = 6)
         const double xs = std::max(pr.left(), X(tr.t0 + k0 * tr.dt));
@@ -274,7 +343,6 @@ void ScopeView::drawTrace(QPainter& p, const QRectF& pr, const TraceData& tr, in
     }
 
     QColor c = traceColor(idx);
-    const double wdt = idx < kNumChannels ? s_.ch[idx].lineWidth : 1.6;
     p.save();
     p.setClipRect(pr.adjusted(1, 1, -1, -1));
     p.setBrush(Qt::NoBrush);
@@ -297,6 +365,7 @@ void ScopeView::drawTrace(QPainter& p, const QRectF& pr, const TraceData& tr, in
             if (std::isfinite(y[k])) p.drawEllipse(QPointF(X(tr.t0 + k * tr.dt), Y(y[k])), 2.2, 2.2);
     }
     p.restore();
+    return false;
 }
 
 void ScopeView::drawPersistence(QPainter& p, const QRectF& pr) {

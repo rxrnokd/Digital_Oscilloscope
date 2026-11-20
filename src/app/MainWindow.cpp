@@ -219,6 +219,7 @@ MainWindow::MainWindow(const AppOptions& opt, QWidget* parent) : QMainWindow(par
 
     resize(opt_.size.isValid() ? opt_.size : QSize(1600, 1000));
     vsplit_->setSizes({620, 330, 150});
+    if (opt_.tab >= 0 && opt_.tab < tabs_->count()) tabs_->setCurrentIndex(opt_.tab);
     hsplit_->setSizes({1200, 390});
     if (opt_.quitAfterMs > 0) {
         QTimer::singleShot(opt_.quitAfterMs, this, [this] {

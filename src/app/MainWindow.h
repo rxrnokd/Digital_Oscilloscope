@@ -38,6 +38,7 @@ struct AppOptions {
     QString openFile;         // CSV / WAV to load at start
     int quitAfterMs = 0;      // auto quit (tests)
     QSize size;               // initial window size
+    int tab = -1;             // control panel tab to show
 };
 
 class MainWindow : public QMainWindow {

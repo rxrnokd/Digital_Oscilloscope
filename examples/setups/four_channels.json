@@ -1,0 +1,22 @@
+{
+    "format": "SIGNAL LAB PRO setup", "version": 1,
+    "description": "All four channels and generators running simultaneously with different waveforms, frequencies and duty cycles.",
+    "channels": [
+        { "enabled": true, "voltsPerDiv": 0.5, "position": 3.0, "input": 0 },
+        { "enabled": true, "voltsPerDiv": 0.5, "position": 1.0, "input": 1 },
+        { "enabled": true, "voltsPerDiv": 0.5, "position": -1.0, "input": 2 },
+        { "enabled": true, "voltsPerDiv": 0.5, "position": -3.0, "input": 3 }
+    ],
+    "generators": [
+        { "shape": "Sine", "frequency": 1000, "vpp": 0.9 },
+        { "shape": "Square", "frequency": 2000, "vpp": 0.9, "duty": 25, "edgeTime": 1e-5 },
+        { "shape": "Triangle", "frequency": 500, "vpp": 0.9 },
+        { "shape": "Sawtooth", "frequency": 1500, "vpp": 0.9, "noiseRms": 0.01 }
+    ],
+    "timebase": { "secPerDiv": 0.0002, "delay": 0, "triggerPos": 50 },
+    "trigger": { "mode": "Auto", "slope": "Rising", "source": 0, "level": 0 },
+    "acquisition": { "source": "Generator", "sampleRate": 1000000 },
+    "math": { "enabled": false },
+    "spectrum": { "enabled": true, "source": 1, "fftSize": 16384, "window": "Hann", "fStart": 0, "fStop": 20000 },
+    "display": { "persistence": "Off" }
+}

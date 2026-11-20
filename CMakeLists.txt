@@ -67,16 +67,21 @@ if(SLP_BUILD_APP)
     find_package(Qt6 6.2 QUIET COMPONENTS Multimedia)
     set(CMAKE_AUTOMOC ON)
 
+    # Widgets (renderers, knobs, theme) - shared by the app and the GUI tests
+    add_library(slp_gui STATIC
+        src/app/Controls.h     src/app/Controls.cpp
+        src/app/ScopeView.h    src/app/ScopeView.cpp
+        src/app/SpectrumView.h src/app/SpectrumView.cpp)
+    target_include_directories(slp_gui PUBLIC src/app)
+    target_link_libraries(slp_gui PUBLIC slp_core Qt6::Widgets Qt6::Gui)
+
     set(APP_SOURCES
         src/app/main.cpp
         src/app/MainWindow.h   src/app/MainWindow.cpp
-        src/app/ScopeView.h    src/app/ScopeView.cpp
-        src/app/SpectrumView.h src/app/SpectrumView.cpp
-        src/app/Controls.h     src/app/Controls.cpp
         src/app/AudioInput.h   src/app/AudioInput.cpp
     )
     qt_add_executable(SignalLabPro MACOSX_BUNDLE WIN32 ${APP_SOURCES})
-    target_link_libraries(SignalLabPro PRIVATE slp_core slp_settings Qt6::Widgets Qt6::Gui)
+    target_link_libraries(SignalLabPro PRIVATE slp_gui slp_settings)
     if(Qt6Multimedia_FOUND)
         target_link_libraries(SignalLabPro PRIVATE Qt6::Multimedia)
         target_compile_definitions(SignalLabPro PRIVATE SLP_HAVE_AUDIO=1)
@@ -127,13 +132,16 @@ if(SLP_BUILD_TESTS)
     endforeach()
 
     if(SLP_BUILD_APP)
+        find_package(Qt6 6.2 QUIET COMPONENTS Test)
+        if(Qt6Test_FOUND)
+            add_executable(slp_gui_tests tests/test_gui.cpp)
+            target_link_libraries(slp_gui_tests PRIVATE slp_gui Qt6::Test)
+            add_test(NAME gui_interaction COMMAND slp_gui_tests)
+            set_tests_properties(gui_interaction PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+        endif()
         # End-to-end restart test: launch the real application, load a setup, quit
         # (session saved), relaunch and verify that the setup was restored.
-        if(APPLE)
-            set(SLP_APP_EXE "$<TARGET_FILE:SignalLabPro>")
-        else()
-            set(SLP_APP_EXE "$<TARGET_FILE:SignalLabPro>")
-        endif()
+        set(SLP_APP_EXE "$<TARGET_FILE:SignalLabPro>")
         add_test(NAME app_restart_restores_settings
             COMMAND ${CMAKE_COMMAND}
                 -DAPP=${SLP_APP_EXE}

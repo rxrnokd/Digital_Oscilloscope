@@ -1,0 +1,16 @@
+{
+    "format": "SIGNAL LAB PRO setup", "version": 1,
+    "description": "Noisy 1 kHz square wave (CH1) and a 4th-order Butterworth low-pass at 3 kHz (MATH). The FFT of MATH shows the attenuated harmonics; switch the FFT source to CH1 to compare before/after.",
+    "channels": [
+        { "enabled": true, "voltsPerDiv": 0.5, "position": 1.6, "input": 0 },
+        { "enabled": false }, { "enabled": false }, { "enabled": false }
+    ],
+    "generators": [ { "shape": "Square", "frequency": 1000, "vpp": 2.0, "offset": 0, "duty": 50, "edgeTime": 0, "noiseRms": 0.12 } ],
+    "timebase": { "secPerDiv": 0.0005, "delay": 0, "triggerPos": 20 },
+    "trigger": { "mode": "Auto", "slope": "Rising", "source": 0, "level": 0, "holdoff": 0, "hysteresisDiv": 0.5 },
+    "acquisition": { "source": "Generator", "sampleRate": 1000000 },
+    "math": { "enabled": true, "op": "LowPass", "srcA": 0, "order": 4, "cutoff": 3000, "unitsPerDiv": 0.5, "position": -2.2 },
+    "spectrum": { "enabled": true, "source": 4, "fftSize": 32768, "window": "BlackmanHarris", "logScale": true,
+                  "refLevel": 10, "dbPerDiv": 10, "fStart": 0, "fStop": 20000, "averages": 8, "spectrogram": true },
+    "display": { "persistence": "Off", "interpolation": "SinX", "glow": true, "cursorMode": "Off", "selectedTrace": 4 }
+}

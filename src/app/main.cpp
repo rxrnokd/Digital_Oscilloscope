@@ -32,7 +32,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption open("open", "Open a CSV/WAV signal file.", "file");
     QCommandLineOption quit("quit-after", "Quit automatically after <ms> milliseconds.", "ms");
     QCommandLineOption size("size", "Initial window size, e.g. 1600x1000.", "WxH");
-    p.addOptions({settings, setup, dump, shot, open, quit, size});
+    QCommandLineOption tab("tab", "Control panel tab to show (0 = CH ... 6 = INPUT).", "index");
+    p.addOptions({settings, setup, dump, shot, open, quit, size, tab});
     p.process(app);
 
     slp::AppOptions opt;
@@ -42,6 +43,7 @@ int main(int argc, char* argv[]) {
     opt.screenshotPath = p.value(shot);
     opt.openFile = p.value(open);
     opt.quitAfterMs = p.value(quit).toInt();
+    if (p.isSet(tab)) opt.tab = p.value(tab).toInt();
     if (p.isSet(size)) {
         const auto parts = p.value(size).split('x');
         if (parts.size() == 2) opt.size = QSize(parts[0].toInt(), parts[1].toInt());

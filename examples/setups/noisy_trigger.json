@@ -1,0 +1,16 @@
+{
+    "format": "SIGNAL LAB PRO setup", "version": 1,
+    "description": "1 kHz sine buried in 0.2 V rms white noise. NORMAL trigger with noise reject (0.5 div hysteresis) keeps the display stable; long persistence shows the noise band; 16x FFT averaging lowers the variance of the noise floor.",
+    "channels": [
+        { "enabled": true, "voltsPerDiv": 0.5, "position": 0, "input": 0 },
+        { "enabled": false }, { "enabled": false }, { "enabled": false }
+    ],
+    "generators": [ { "shape": "Sine", "frequency": 1000, "vpp": 2.0, "noiseRms": 0.2 } ],
+    "timebase": { "secPerDiv": 0.0002, "delay": 0, "triggerPos": 50 },
+    "trigger": { "mode": "Normal", "slope": "Rising", "source": 0, "level": 0, "hysteresisDiv": 0.5 },
+    "acquisition": { "source": "Generator", "sampleRate": 1000000 },
+    "math": { "enabled": false },
+    "spectrum": { "enabled": true, "source": 0, "fftSize": 16384, "window": "Hann", "fStart": 0, "fStop": 20000,
+                  "refLevel": 10, "dbPerDiv": 10, "averages": 16 },
+    "display": { "persistence": "Long", "glow": false }
+}

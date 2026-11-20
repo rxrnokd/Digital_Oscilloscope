@@ -12,6 +12,7 @@
 #include "ScopeSettings.h"
 
 #include <QImage>
+#include <QPixmap>
 #include <QWidget>
 
 #include <memory>
@@ -60,7 +61,8 @@ private:
 
     void drawGrid(QPainter& p, const QRectF& pr);
     void drawTraces(QPainter& p, const QRectF& pr, double alpha, bool glow);
-    void drawTrace(QPainter& p, const QRectF& pr, const TraceData& tr, int idx, double alpha, bool glow);
+    // returns true if the trace was rasterized into layer_ (dense / busy data)
+    bool drawTrace(QPainter& p, const QRectF& pr, const TraceData& tr, int idx, double alpha, bool glow);
     void drawPersistence(QPainter& p, const QRectF& pr);
     void drawMarkers(QPainter& p, const QRectF& pr);
     void drawCursors(QPainter& p, const QRectF& pr);
@@ -79,6 +81,9 @@ private:
     int wheelAccum_ = 0;
     std::vector<std::pair<QRectF, int>> badgeRects_;
     QImage persist_;
+    QImage layer_; // device-resolution span layer for dense traces
+    QPixmap background_; // cached background + graticule
+    QString backgroundKey_;
     uint64_t persistSeq_ = 0;
     QString persistKey_;
 };

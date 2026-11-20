@@ -1,0 +1,23 @@
+{
+    "format": "SIGNAL LAB PRO setup", "version": 1,
+    "description": "1 kHz fundamental (2 Vpp) + 10 % 3rd + 5 % 5th harmonic. Expected THD = sqrt(0.1^2 + 0.05^2) = 11.18 %, H3 = -20.0 dBc, H5 = -26.0 dBc.",
+    "channels": [
+        { "enabled": true, "voltsPerDiv": 0.5, "position": 0, "input": 0 },
+        { "enabled": false }, { "enabled": false }, { "enabled": false }
+    ],
+    "generators": [
+        { "shape": "Custom", "frequency": 1000, "offset": 0, "noiseRms": 0.0005,
+          "components": [
+              { "shape": "Sine", "multiple": 1, "vpp": 2.0, "phaseDeg": 0 },
+              { "shape": "Sine", "multiple": 3, "vpp": 0.2, "phaseDeg": 0 },
+              { "shape": "Sine", "multiple": 5, "vpp": 0.1, "phaseDeg": 0 }
+          ] }
+    ],
+    "timebase": { "secPerDiv": 0.0002, "delay": 0, "triggerPos": 50 },
+    "trigger": { "mode": "Auto", "slope": "Rising", "source": 0, "level": 0 },
+    "acquisition": { "source": "Generator", "sampleRate": 1000000 },
+    "math": { "enabled": false },
+    "spectrum": { "enabled": true, "source": 0, "fftSize": 65536, "window": "BlackmanHarris", "logScale": true,
+                  "refLevel": 10, "dbPerDiv": 10, "fStart": 0, "fStop": 10000, "averages": 4, "spectrogram": true },
+    "display": { "persistence": "Off" }
+}

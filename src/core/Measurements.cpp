@@ -118,20 +118,26 @@ MeasurementSet measure(const float* x, size_t n, double dt) {
         const int iTop = static_cast<int>(std::max_element(h.begin() + B / 2, h.end()) - h.begin());
         const int iBase = static_cast<int>(std::max_element(h.begin(), h.begin() + B / 2) - h.begin());
         if (iTop - iBase >= B / 2) {
-            // classification uses the +-10 % band; the level itself is the mean of the
-            // samples within +-2 % of the mode (excludes edge samples, unbiased for noise)
+            // classification uses the +-10 % band; the level itself is the MEDIAN of the
+            // samples within +-2 % of the mode: unbiased for noise and insensitive to the
+            // few edge samples that fall into the band on one side only
             constexpr int narrow = 4;
-            double sT = 0, sB = 0;
-            size_t cT = 0, cB = 0, nT = 0, nB = 0;
+            std::vector<float> vT, vB;
+            size_t cT = 0, cB = 0;
             for (size_t i = 0; i < n; ++i) {
                 const int b = std::min(B - 1, static_cast<int>((x[i] - mn) * scale));
                 const int dT = std::abs(b - iTop), dB = std::abs(b - iBase);
-                if (dT <= band) { ++cT; if (dT <= narrow) { sT += x[i]; ++nT; } }
-                else if (dB <= band) { ++cB; if (dB <= narrow) { sB += x[i]; ++nB; } }
+                if (dT <= band) { ++cT; if (dT <= narrow) vT.push_back(x[i]); }
+                else if (dB <= band) { ++cB; if (dB <= narrow) vB.push_back(x[i]); }
             }
-            if (nT > 0 && nB > 0 && static_cast<double>(cT + cB) >= 0.6 * static_cast<double>(n)) {
-                top = sT / static_cast<double>(nT);
-                base = sB / static_cast<double>(nB);
+            if (!vT.empty() && !vB.empty() && static_cast<double>(cT + cB) >= 0.6 * static_cast<double>(n)) {
+                auto median = [](std::vector<float>& v) {
+                    auto mid = v.begin() + static_cast<long>(v.size() / 2);
+                    std::nth_element(v.begin(), mid, v.end());
+                    return static_cast<double>(*mid);
+                };
+                top = median(vT);
+                base = median(vB);
                 r.twoLevel = true;
             }
         }
@@ -147,7 +153,20 @@ MeasurementSet measure(const float* x, size_t n, double dt) {
     const bool timingPossible = amp > 0.0 && amp > 1e-9 * std::max(std::fabs(top), std::fabs(base));
     if (timingPossible) {
         const double mid = 0.5 * (top + base);
-        c = findCrossings(x, n, mid, 0.05 * amp);
+        // Crossing hysteresis: 5 % of the amplitude, raised to 3 sigma of the white-noise
+        // level (robust MAD estimate from first differences) for noisy signals, at most
+        // 25 % of the amplitude.
+        double hyst = 0.05 * amp;
+        if (n >= 16) {
+            std::vector<float> d;
+            d.reserve(n - 1);
+            for (size_t i = 1; i < n; ++i) d.push_back(std::fabs(x[i] - x[i - 1]));
+            auto m = d.begin() + static_cast<long>(d.size() / 2);
+            std::nth_element(d.begin(), m, d.end());
+            const double sigma = 1.4826 * static_cast<double>(*m) / std::sqrt(2.0);
+            hyst = std::clamp(3.0 * sigma, hyst, 0.25 * amp);
+        }
+        c = findCrossings(x, n, mid, hyst);
         r.risingEdges = static_cast<int>(c.rises.size());
         r.fallingEdges = static_cast<int>(c.falls.size());
         periodS = periodFrom(c.rises);
@@ -196,9 +215,11 @@ MeasurementSet measure(const float* x, size_t n, double dt) {
                 sum += (tEnd - tStart);
                 ++count;
             }
+            // If most edges are faster than one sample interval the result is an upper
+            // bound; averaging only the few noise-widened edges would be biased.
             MeasValue v;
-            if (count > 0) v = {sum / count * dt, true, false};
-            else if (limited > 0) v = {dt, true, true};
+            if (limited > 0 && limited >= count) v = {dt, true, true};
+            else if (count > 0) v = {sum / count * dt, true, false};
             return v;
         };
         r[MeasId::Rise] = edgeTimes(c.rises, true);

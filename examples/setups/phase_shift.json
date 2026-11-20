@@ -1,0 +1,19 @@
+{
+    "format": "SIGNAL LAB PRO setup", "version": 1,
+    "description": "Two 1 kHz sines, CH2 lags CH1 by 60 deg (166.7 us). MATH = CH1 - CH2 has amplitude 2 sin(30 deg) = 1 V peak. Cursors X1/X2 sit on the two rising zero crossings.",
+    "channels": [
+        { "enabled": true, "voltsPerDiv": 0.5, "position": 1.5, "input": 0 },
+        { "enabled": true, "voltsPerDiv": 0.5, "position": 1.5, "input": 1 },
+        { "enabled": false }, { "enabled": false }
+    ],
+    "generators": [
+        { "shape": "Sine", "frequency": 1000, "vpp": 2.0, "phaseDeg": 0 },
+        { "shape": "Sine", "frequency": 1000, "vpp": 2.0, "phaseDeg": -60 }
+    ],
+    "timebase": { "secPerDiv": 0.0002, "delay": 0, "triggerPos": 30 },
+    "trigger": { "mode": "Auto", "slope": "Rising", "source": 0, "level": 0, "holdoff": 0, "hysteresisDiv": 0.08 },
+    "acquisition": { "source": "Generator", "sampleRate": 1000000 },
+    "math": { "enabled": true, "op": "Subtract", "srcA": 0, "srcB": 1, "unitsPerDiv": 0.5, "position": -2.5 },
+    "spectrum": { "enabled": true, "source": 4, "fftSize": 16384, "window": "FlatTop", "fStart": 0, "fStop": 5000 },
+    "display": { "cursorMode": "Manual", "cursorSource": 0, "cursorX1": 0, "cursorX2": 0.00016667, "cursorY1": 0, "cursorY2": 1.0 }
+}

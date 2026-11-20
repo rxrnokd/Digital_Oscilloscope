@@ -179,12 +179,12 @@ TEST(generator_pulse_edge_time) {
     const double fs = 10e6;
     auto x = gen(g, fs, 50000);
     auto m = measure(x.data(), x.size(), 1.0 / fs);
-    CHECK_NEAR(m[MeasId::Rise].v, 2e-6, 0.02 * 2e-6);
-    CHECK_NEAR(m[MeasId::Fall].v, 2e-6, 0.02 * 2e-6);
+    CHECK_NEAR(m[MeasId::Rise].v, 2e-6, 0.002 * 2e-6);
+    CHECK_NEAR(m[MeasId::Fall].v, 2e-6, 0.002 * 2e-6);
     CHECK(!m[MeasId::Rise].upperBound);
     CHECK_NEAR(m[MeasId::Duty].v, 30.0, 0.3);
-    CHECK_NEAR(m[MeasId::Top].v, 3.3, 1e-3);
-    CHECK_NEAR(m[MeasId::Base].v, 0.0, 1e-3);
+    CHECK_NEAR(m[MeasId::Top].v, 3.3, 1e-5);
+    CHECK_NEAR(m[MeasId::Base].v, 0.0, 1e-5);
     CHECK_NEAR(m[MeasId::Freq].v, 10e3, 1.0);
 }
 
@@ -232,6 +232,12 @@ TEST(generator_dc_and_noise) {
     m = measure(x.data(), x.size(), 1.0 / fs);
     CHECK_NEAR(m[MeasId::AcRms].v, std::sqrt(0.5 + 0.0025), 2e-3);
     CHECK_NEAR(m[MeasId::Freq].v, 1000.0, 0.5);
+    // heavy noise (SNR ~ 11 dB): adaptive hysteresis still finds the period
+    s.noiseRms = 0.2;
+    x = gen(s, fs, 2000, 5); // two periods on screen
+    m = measure(x.data(), x.size(), 1.0 / fs);
+    CHECK(m[MeasId::Freq].valid);
+    CHECK_NEAR(m[MeasId::Freq].v, 1000.0, 20.0);
 }
 
 TEST(generator_phase_and_continuity) {
